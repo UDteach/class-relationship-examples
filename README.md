@@ -1,3 +1,5 @@
+---
+
 ### オブジェクト指向設計：主要なクラス関係性リファレンス (テキストRPG構築編)
 
 ---
@@ -7,7 +9,7 @@
 
 > 我々が開発するソフトウェアは、多数のコンポーネント（クラス）の集合体です。シンプルなテキストRPGでさえ、「プレイヤー」「モンスター」「アイテム」「マップ」など、様々な責務を持つ部品から成り立っています。これらの部品を**いかに疎結合かつ高凝集に設計するか**が、システムの保守性、拡張性、そしてテストの容易性を決定づけるからです。このリファレンスでは、その部品同士の「つなぎ方」のパターンを学び、より堅牢な設計判断を下すための武器を身につけます。
 
-C++とJavaを中心に、実務で頻出する6つの関係性（Inheritance, Interface, Composition, Aggregation, Association, Dependency）の違いを、具体的なシナリオを通して解説します。
+C++、Java、そしてC#を中心に、実務で頻出する6つの関係性（Inheritance, Interface, Composition, Aggregation, Association, Dependency）の違いを、具体的なシナリオを通して解説します。
 
 ---
 
@@ -167,6 +169,22 @@ class Player extends Character {
 }
 ```
 
+```csharp
+// C#: abstractクラスで共通の基盤を定義
+public abstract class Character
+{
+    protected string Name { get; set; }
+    protected int Hp { get; set; }
+    public abstract void Attack(Character target);
+}
+
+// Characterを継承してPlayerを実装
+public class Player : Character
+{
+    public override void Attack(Character target) { /* プレイヤーの攻撃処理 */ }
+}
+```
+
 #### 2. Interface（インターフェース実装）
 **特徴**: **"can-do"（～できる）**。特定の「機能セット」をクラスに契約させる仕組み。継承関係にないクラス群に「使用可能」のような共通の振る舞いを横断的に付与したい場合に用います。
 
@@ -200,6 +218,20 @@ class Potion extends Item implements Usable {
 }
 ```
 
+```csharp
+// C#: interfaceキーワードで機能を契約。慣習的に'I'で始める
+public interface IUsable
+{
+    void Use(Character target);
+}
+
+// Itemを継承しつつ、IUsableインターフェースを実装
+public class Potion : Item, IUsable
+{
+    public void Use(Character target) { /* 対象のHPを回復する処理 */ }
+}
+```
+
 #### 3. Composition（コンポジション／包含）
 **特徴**: **"owns-a"（～を所有する）**。パーツ（部分）のライフサイクルが、全体に完全に依存する強い所有関係です。「全体」が消滅すれば、「部分」も一緒に消滅します。
 
@@ -227,9 +259,24 @@ class Player {
 
     public Player() {
         // 外部からは差し替えられない
-        this.inventory = new Inventory();
+        this->inventory = new Inventory();
     }
     // PlayerインスタンスがGCされると、inventoryもGCの対象となる
+}
+```
+
+```csharp
+// C#: readonlyフィールドで不変性を保証し、コンストラクタで初期化
+public class Player
+{
+    // Playerは自身のInventoryを所有し、外部から変更できない
+    private readonly Inventory inventory;
+
+    public Player()
+    {
+        this.inventory = new Inventory();
+    }
+    // PlayerインスタンスがGCの対象になると、inventoryも同様に対象となる
 }
 ```
 
@@ -262,6 +309,25 @@ class GameMap {
     }
     public void addCharacter(Character character) {
         this.characters.add(character);
+    }
+}
+```
+
+```csharp
+// C#: List<T>で参照のコレクションを管理
+public class GameMap
+{
+    // Characterの参照をリストで管理する
+    private readonly List<Character> characters;
+
+    public GameMap()
+    {
+        this.characters = new List<Character>();
+    }
+    // 外部で生成されたCharacterインスタンスを追加する
+    public void AddCharacter(Character character)
+    {
+        this.characters.Add(character);
     }
 }
 ```
@@ -301,6 +367,26 @@ class Game {
 }
 ```
 
+```csharp
+// C#: 依存性注入(DI)コンテナなどから参照を受け取るのが一般的
+public class Game
+{
+    // 外部で生成されたサービスへの参照を保持する
+    private readonly IBattleManager battleManager;
+
+    // コンストラクタで依存性を注入する
+    public Game(IBattleManager battleManager)
+    {
+        this.battleManager = battleManager;
+    }
+    public void TriggerBattle(Player player, Monster monster)
+    {
+        // 関連するオブジェクトのサービスを利用する
+        battleManager.StartBattle(player, monster);
+    }
+}
+```
+
 #### 6. Dependency（依存）
 **特徴**: **一時的な利用関係**。あるクラスのメソッドが、処理の実行中だけ別のクラスを一時的に利用する関係。メソッドの引数で受け取るか、メソッド内でインスタンス化して使い捨てるのが典型です。
 
@@ -331,6 +417,20 @@ class Player extends Character {
     }
 }
 ```
+
+```csharp
+// C#: メソッドスコープのローカル変数としてインスタンス化
+public class Player : Character
+{
+    public override void Attack(Character target)
+    {
+        // Attackメソッドの実行中だけ、DamageCalculatorに一時的に依存する
+        var calculator = new DamageCalculator();
+        int damage = calculator.Calculate(this, target);
+        // ...ダメージを与える処理...
+    }
+}
+```
 ---
 
 ### 実装時の判断フロー
@@ -340,10 +440,10 @@ class Player extends Character {
 ```mermaid
 flowchart TD
     A[クラスAとクラスBの関係を考える] --> B{どんな関係が一番しっくりくる？}
-    B -->|"B is a A<br>（例: Player is a Character）"| C["Inheritance (継承)<br><br>キーワード: is-a, 汎化/特化<br>実装: extends, public継承<br>判断: 親の責務・構造を再利用し、子として拡張したいか？"]
-    B -->|"B can do X<br>（例: Potion can do Usable）"| D["Interface (実装)<br><br>キーワード: can-do, 契約, 機能<br>実装: implements, 純粋仮想<br>判断: 継承階層と無関係に、複数のクラスへ横断的に「機能」を付与したいか？"]
+    B -->|"B is a A<br>（例: Player is a Character）"| C["Inheritance (継承)<br><br>キーワード: is-a, 汎化/特化<br>実装: extends, public継承, :<br>判断: 親の責務・構造を再利用し、子として拡張したいか？"]
+    B -->|"B can do X<br>（例: Potion can do Usable）"| D["Interface (実装)<br><br>キーワード: can-do, 契約, 機能<br>実装: implements, 純粋仮想, :<br>判断: 継承階層と無関係に、複数のクラスへ横断的に「機能」を付与したいか？"]
     B -->|"A has a B<br>（例: Player has an Inventory）"| E{ライフサイクルの関係は？<br>（AとBは運命共同体か？）}
-    E -->|"一心同体<br>（AがなければBは無意味）"| F["Composition (包含)<br><br>キーワード: owns-a, 部分/全体<br>実装: unique_ptr, final<br>判断: AがBを内部で生成・管理し、Aが消えたらBも消えるべきか？"]
+    E -->|"一心同体<br>（AがなければBは無意味）"| F["Composition (包含)<br><br>キーワード: owns-a, 部分/全体<br>実装: unique_ptr, final/readonly<br>判断: AがBを内部で生成・管理し、Aが消えたらBも消えるべきか？"]
     E -->|"独立している<br>（AがなくてもBは存在できる）"| G{どういう持ち方？<br>（対等な連携か、集合の管理か？）}
     G -->|"AがBの集合を管理する<br>(例: GameMap has Characters)"| H["Aggregation (集約)<br><br>キーワード: has-a, 集合体<br>実装: ポインタ/参照のコンテナ<br>判断: AはBの「集まり」を管理するが、B自体の管理責任は持たないか？"]
     G -->|"対等な立場で連携する<br>(例: GameとBattleManager)"| I["Association (関連)<br><br>キーワード: collaborates-with, 対等<br>実装: メンバ参照/ポインタ<br>判断: お互い独立しているが、長期間にわたって連携し続けるか？"]
@@ -357,36 +457,36 @@ flowchart TD
 実際のシステムは、複数の関係性を柔軟に組み合わせることで、現実に即した堅牢な設計になります。
 
 #### パターン1: 階層構造（継承） + 機能分離（インターフェース）
-キャラクターの基本構造を**継承**で作り、特定のアイテムに「使用可能」という機能を**インターフェース**で分離して実装する、王道パターンです。
-
 **例**: `Character`という基本構造を**継承**した`Player`が、`Usable`という**インターフェース**を実装した`Potion`を使用する。
 
 ```cpp
 // C++
-// 機能 (can-do)
 class Usable { public: virtual void use(Character& c) = 0; virtual ~Usable() = default; };
-// 階層構造 (is-a)
 class Item { /*...*/ };
 class Potion : public Item, public Usable {
 public:
-    void use(Character& c) override { /* 回復処理 */ std::cout << "Player used a potion." << std::endl; }
+    void use(Character& c) override { /* 回復処理 */ }
 };
 ```
 ```java
 // Java
-// 機能 (can-do)
 interface Usable { void use(Character target); }
-// 階層構造 (is-a)
 abstract class Item { /*...*/ }
 class Potion extends Item implements Usable {
     @Override
-    public void use(Character target) { /* 回復処理 */ System.out.println("Player used a potion."); }
+    public void use(Character target) { /* 回復処理 */ }
+}
+```
+```csharp
+// C#
+public interface IUsable { void Use(Character target); }
+public abstract class Item { /*...*/ }
+public class Potion : Item, IUsable {
+    public void Use(Character target) { /* 回復処理 */ }
 }
 ```
 
 #### パターン2: 集約 + 依存の組み合わせ
-オブジェクトの集合を管理（**集約**）しつつ、その集合に対する操作のために、別の処理クラスを一時的に利用（**依存**）するパターンです。
-
 **例**: `Game`が`GameMap`上の`Monster`の集合を管理し、「戦闘開始」の際に`BattleSequence`クラスを一時的に利用して戦闘処理を行う。
 
 ```cpp
@@ -419,28 +519,37 @@ class Game {
     }
 }
 ```
+```csharp
+// C#
+public class Game {
+    private GameMap map; // Aggregation
+    public void CheckForBattle(Player player) {
+        if (map.HasMonsterNear(player)) {
+            Monster monster = map.GetNearestMonster(player);
+            // BattleSequenceを一時的に利用 (Dependency)
+            var battle = new BattleSequence(player, monster);
+            battle.Run();
+        }
+    }
+}
+```
 
 #### パターン3: コンポジション + 関連
-コンポーネント内部の部品を**コンポジション**で隠蔽しつつ、その部品が外部の独立したサービスと**関連**を持って連携するパターンです。
-
 **例**: `Player`は`Inventory`を**所有（コンポジション）**し、`Inventory`が`ItemDatabase`サービスと**連携（関連）**してアイテム情報を取得する。
 
 ```cpp
 // C++
 class Player {
 private:
-    // InventoryはPlayerが所有する (Composition)
-    std::unique_ptr<Inventory> inventory;
+    std::unique_ptr<Inventory> inventory; // Composition
 public:
     Player(ItemDatabase* db) {
-        // 内部部品に外部サービスを渡す
         this->inventory = std::make_unique<Inventory>(db);
     }
 };
-// InventoryはItemDatabaseと連携する (Association)
 class Inventory {
 private:
-    ItemDatabase* db; // 非所有ポインタ
+    ItemDatabase* db; // Association
 public:
     Inventory(ItemDatabase* db) : db(db) {}
 };
@@ -448,67 +557,79 @@ public:
 ```java
 // Java
 class Player {
-    // InventoryはPlayerが所有する (Composition)
-    private final Inventory inventory;
+    private final Inventory inventory; // Composition
     public Player(ItemDatabase db) {
-        // 内部部品に外部サービスを渡す
         this->inventory = new Inventory(db);
     }
 }
-// InventoryはItemDatabaseと連携する (Association)
 class Inventory {
-    private final ItemDatabase db; // メンバ変数として保持
+    private final ItemDatabase db; // Association
     public Inventory(ItemDatabase db) { this.db = db; }
+}
+```
+```csharp
+// C#
+public class Player {
+    private readonly Inventory inventory; // Composition
+    public Player(IItemDatabase db) {
+        this.inventory = new Inventory(db);
+    }
+}
+public class Inventory {
+    private readonly IItemDatabase db; // Association
+    public Inventory(IItemDatabase db) { this.db = db; }
 }
 ```
 ---
 #### パターン4: ファクトリーパターン（依存 + 継承/インターフェース）
-**概要**: オブジェクトの生成プロセスを専門のクラス（ファクトリー）にカプセル化するパターン。これにより、呼び出し元は具体的なクラス名を知ることなく、抽象的なインターフェースや基底クラスにのみ依存してオブジェクトを取得できます。
-
-**シナリオ**: `GameMap`が、エリアの難易度に応じて異なる種類の`Monster`を生成する。例えば「森」なら`Slime`、「洞窟」なら`Bat`を生成したいが、`GameMap`は具体的なモンスター名を知るべきではありません。
-
-*   `GameMap`は`MonsterFactory`に**依存**します。
-*   `MonsterFactory`は、リクエストに応じて`Slime`や`Bat`といった、`Monster`を**継承**した具体的なインスタンスを生成して返します。
+**シナリオ**: `GameMap`が、エリアの難易度に応じて異なる種類の`Monster`を生成する。`GameMap`は具体的なモンスター名を知るべきではありません。
 
 ```cpp
 // C++
-// ファクトリーは、生成するモンスターの基底クラスにのみ依存
 class MonsterFactory {
 public:
-    // 難易度に応じて適切なモンスターを生成して返す
     static std::unique_ptr<Monster> createMonster(std::string difficulty) {
         if (difficulty == "easy") return std::make_unique<Slime>();
         if (difficulty == "normal") return std::make_unique<Goblin>();
         return nullptr;
     }
 };
-
-// 呼び出し元 (GameMapなど) はファクトリーに生成を依頼する (依存)
 class GameMap {
 public:
     void spawnMonsters() {
-        // 具体的なSlimeやGoblinクラスを知らなくても生成できる
-        monsters.push_back(MonsterFactory::createMonster("easy"));
+        monsters.push_back(MonsterFactory::createMonster("easy")); // Dependency
     }
 };
 ```
 ```java
 // Java
-// ファクトリークラス
 class MonsterFactory {
-    // 戻り値は抽象的なMonster型
     public static Monster createMonster(String difficulty) {
         if ("easy".equals(difficulty)) return new Slime();
         if ("normal".equals(difficulty)) return new Goblin();
         return null;
     }
 }
-
-// 呼び出し元
 class GameMap {
     public void spawnMonsters() {
-        // MonsterFactoryを利用してモンスターを生成 (依存)
-        monsters.add(MonsterFactory.createMonster("easy"));
+        monsters.add(MonsterFactory.createMonster("easy")); // Dependency
+    }
+}
+```
+```csharp
+// C#
+public static class MonsterFactory {
+    public static Monster CreateMonster(string difficulty) {
+        switch (difficulty) {
+            case "easy": return new Slime();
+            case "normal": return new Goblin();
+            default: return null;
+        }
+    }
+}
+public class GameMap {
+    public void SpawnMonsters() {
+        monsters.Add(MonsterFactory.CreateMonster("easy")); // Dependency
     }
 }
 ```
@@ -517,33 +638,23 @@ class GameMap {
 ---
 
 #### パターン5: ストラテジーパターン（関連/コンポジション + インターフェース）
-**概要**: アルゴリズム（戦略）の集合をそれぞれクラスとして定義し、実行時にクライアントが動的に戦略を切り替えられるようにするパターンです。
-
-**シナリオ**: `Monster`の行動パターン（AI）を、状況に応じて切り替えたい。「通常モード」では通常攻撃のみ、「激昂モード」では強力なスキルを多用する、といった振る舞いを実装します。
-
-*   `Monster`は、`AIStrategy`**インターフェース**への**関連（またはコンポジション）**を持ちます。
-*   `NormalModeAI`や`BerserkModeAI`が、`AIStrategy`**インターフェース**を実装した具体的な戦略クラスとなります。
-*   `Monster`は、自身のHPが減るなどの条件に応じて、保持している戦略オブジェクトを差し替えます。
+**シナリオ**: `Monster`の行動パターン（AI）を、状況に応じて切り替えたい。「通常モード」と「激昂モード」を動的に切り替えます。
 
 ```cpp
 // C++
-// 戦略のインターフェース
 class AIStrategy {
 public:
     virtual void execute(Monster& self, Player& target) = 0;
     virtual ~AIStrategy() = default;
 };
-
-// Monsterは戦略を所有し、実行時に利用する (コンポジション/関連)
 class Monster : public Character {
 private:
-    std::unique_ptr<AIStrategy> strategy;
+    std::unique_ptr<AIStrategy> strategy; // Composition
 public:
     Monster() : strategy(std::make_unique<NormalModeAI>()) {}
     void takeTurn(Player& target) {
         strategy->execute(*this, target);
         if (this->hp < 50) {
-            // HPが減ったら戦略を切り替える
             this->strategy = std::make_unique<BerserkModeAI>();
         }
     }
@@ -551,24 +662,28 @@ public:
 ```
 ```java
 // Java
-// 戦略のインターフェース
-interface AIStrategy {
-    void execute(Monster self, Player target);
-}
-
-// Monsterは戦略をメンバとして保持する (関連)
+interface AIStrategy { void execute(Monster self, Player target); }
 class Monster extends Character {
-    private AIStrategy strategy = new NormalModeAI();
-
-    public void setStrategy(AIStrategy strategy) {
-        this->strategy = strategy;
-    }
-
+    private AIStrategy strategy = new NormalModeAI(); // Association
+    public void setStrategy(AIStrategy strategy) { this.strategy = strategy; }
     public void takeTurn(Player target) {
         strategy.execute(this, target);
-        if (this->hp < 50) {
-            // HPが減ったら、外部から新しい戦略をセットしてもらう
-            this->setStrategy(new BerserkModeAI());
+        if (this.hp < 50) {
+            this.setStrategy(new BerserkModeAI());
+        }
+    }
+}
+```
+```csharp
+// C#
+public interface IAIStrategy { void Execute(Monster self, Player target); }
+public class Monster : Character {
+    private IAIStrategy strategy; // Association
+    public Monster(IAIStrategy initialStrategy) { this.strategy = initialStrategy; }
+    public void TakeTurn(Player target) {
+        strategy.Execute(this, target);
+        if (this.Hp < 50 && !(strategy is BerserkModeAI)) {
+            this.strategy = new BerserkModeAI();
         }
     }
 }
@@ -578,55 +693,50 @@ class Monster extends Character {
 ---
 
 #### パターン6: オブザーバーパターン（集約/関連 + インターフェース）
-**概要**: あるオブジェクト（通知元, Subject）の状態変化を、それに依存する複数のオブジェクト（監視役, Observer）へ自動的に通知して更新させるパターンです。
-
-**シナリオ**: `Player`がレベルアップした際に、複数の異なるコンポーネントがそのイベントを知る必要がある。例えば、`UIManager`は画面に「Level Up!」と表示し、`AchievementManager`は実績が解除されたかチェックし、`GameLogger`はそのイベントをログに記録します。
-
-*   `Player`（Subject）は、`PlayerObserver`**インターフェース**のリストを**集約**します。
-*   `UIManager`, `AchievementManager`, `GameLogger`などが、`PlayerObserver`**インターフェース**を実装した具体的な監視役クラスとなります。
-*   `Player`はレベルアップした際、登録されている全ての監視役に通知メソッド（`notifyLevelUp`など）を呼び出します。
+**シナリオ**: `Player`がレベルアップした際に、`UIManager`や`AchievementManager`などの複数のコンポーネントがそのイベントを検知して、それぞれ固有の処理を実行します。
 
 ```cpp
 // C++
-// 監視役のインターフェース
 class PlayerObserver {
 public:
     virtual void onLevelUp(Player& player) = 0;
     virtual ~PlayerObserver() = default;
 };
-
-// 通知元は監視役のリストを保持する (集約)
 class Player : public Character {
 private:
-    std::vector<PlayerObserver*> observers;
+    std::vector<PlayerObserver*> observers; // Aggregation
 public:
-    void addObserver(PlayerObserver* observer) { observers.push_back(observer); }
+    void addObserver(PlayerObserver* o) { observers.push_back(o); }
     void levelUp() {
-        // ... レベルアップ処理 ...
-        // 登録された全ての監視役に通知
-        for (auto observer : observers) {
-            observer->onLevelUp(*this);
-        }
+        // ...
+        for (auto observer : observers) { observer->onLevelUp(*this); }
     }
 };
 ```
 ```java
 // Java
-// 監視役のインターフェース
-interface PlayerObserver {
-    void onPlayerLevelUp(Player player);
-}
-
-// 通知元は監視役のリストを保持する (集約)
+interface PlayerObserver { void onPlayerLevelUp(Player player); }
 class Player extends Character {
-    private final List<PlayerObserver> observers = new ArrayList<>();
-    public void addObserver(PlayerObserver observer) { observers.add(observer); }
-
+    private final List<PlayerObserver> observers = new ArrayList<>(); // Aggregation
+    public void addObserver(PlayerObserver o) { observers.add(o); }
     public void levelUp() {
-        // ... レベルアップ処理 ...
+        // ...
+        for (PlayerObserver o : observers) { o.onPlayerLevelUp(this); }
+    }
+}
+```
+```csharp
+// C# (C#ではeventを使うのがより一般的ですが、他言語と構成を合わせてリストで実装)
+public interface IPlayerObserver { void OnPlayerLevelUp(Player player); }
+public class Player : Character {
+    private readonly List<IPlayerObserver> observers = new List<IPlayerObserver>(); // Aggregation
+    public void AddObserver(IPlayerObserver o) { observers.Add(o); }
+    public void RemoveObserver(IPlayerObserver o) { observers.Remove(o); }
+    public void LevelUp() {
+        // ...レベルアップ処理...
         // 登録された全ての監視役に通知
-        for (PlayerObserver observer : observers) {
-            observer.onPlayerLevelUp(this);
+        foreach (var observer in observers) {
+            observer.OnPlayerLevelUp(this);
         }
     }
 }
